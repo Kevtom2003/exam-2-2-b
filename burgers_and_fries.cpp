@@ -10,6 +10,14 @@ using namespace std;
 #define FRIES 1
 const char* type_names[] = {"BURGER", "FRIES"};
 #define pii pair<int, int>
+//declaring synchronization variable globally 
+mutex m;
+sem_t burgers;
+sem_t fries;
+int currsize;
+int numpreffered;
+int nonpreffered;
+int currpref;
 
 int k;
 
@@ -26,6 +34,37 @@ void place_order(int type) {
      *     otherwise place this order (print order)
      *  Use type_names[type] to print the order type
      */
+    if(currsize == k){
+        m.lock();
+        cout << "Waiting: " << type_names[type] << endl;
+        m.unlock();
+        if(type == currpref){
+            numpreffered+=1;
+            sem_wait(&burgers);
+        }else{
+            nonpreffered+=1;
+            sem_wait(&fries);
+        }
+    }else{
+        currpref=type;
+    }
+    m.lock();
+    currsize+=1;
+    cout << "Order: " << type_names[type] << endl;
+    m.unlock();
+
+    // bool waited = false;
+    // if(sem_trywait(&spots) != 0){
+    //     if(type == currpref){
+    //         sem_post(&waiting);
+    //     }
+    //     waited = true;
+        
+    // }else{
+        
+    //     currpref = type;
+    // }
+    
 
     process_order();        // Do not remove, simulates preparation
 
@@ -33,11 +72,27 @@ void place_order(int type) {
      *  Add logic for synchronization after order processed
      *  Allow next order of the same type to proceed if there is any waiting; if not, allow the other type to proceed.
      */
-}
+    if(numpreffered > 0){
+        sem_post(&burgers);
+        numpreffered-=1;
+    }else if(nonpreffered>0){
+        sem_post(&fries);
+        nonpreffered-=1;
+    }
+    currsize-=1;
+
+
+
+    }
+
 
 int main() {
     // Initialize necessary variables, semaphores etc.
-    
+    sem_init(&burgers,0,0);
+    sem_init(&fries,0,0);
+    currsize=0;
+    numpreffered=0;
+    nonpreffered=0;
     // Read data: done for you, do not change
     pii incoming[MAX_THREADS];
     int _type, _arrival;
@@ -49,7 +104,6 @@ int main() {
         incoming[i].first = _type;
         incoming[i].second = _arrival;
     }
-
     // Create threads: done for you, do not change
     thread* threads[MAX_THREADS];
     for (int i = 0; i < t; ++i) {
